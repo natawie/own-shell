@@ -30,14 +30,6 @@ struct Shell {
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'t> {
-    // // shell-defined commands
-    // Cd,
-    // Echo,
-    // Exit,
-    // False,
-    // LastExit,
-    // Pwd,
-    // True,
     // operators
     EndLine,
     IfFalse,
@@ -76,11 +68,14 @@ impl Shell {
 
     fn execute_process(&mut self, process: &str, args: Vec<CString>) {
         match process {
-            "||" => {
-                if self.last_exit_status == 0 {
-                    self.skip_next = true;
-                }
-            },
+            // "||" => {
+            //     self.skip_next = self.last_exit_status == 0;
+            //     println!("{}", self.skip_next);
+            // },
+            // "&&" => {
+            //     self.skip_next = self.last_exit_status != 0;
+            //     println!("{}", self.skip_next);
+            // },
             "cd" => {
                 // TODO: empty cd goes to $HOME
                 if args.len() == 1 {
@@ -121,6 +116,9 @@ impl Shell {
             "false" => {
                 exit(1)
             },
+            "exit" => {
+                exit(0)
+            }
             _ => {
                 let mut process_path = String::new();
                 if !process.starts_with("/") {
@@ -145,7 +143,6 @@ impl Shell {
                 } else {
                     process_path = process.to_string();
                 }
-                println!("{} {:?}", process_path, args);
 
                 match execvp(CString::new(process_path).unwrap().as_c_str(), &args) {
                     Ok(_) => {},
@@ -209,13 +206,19 @@ impl Shell {
                 Token::Command(v) => {
                     if tk.0.is_some() {
                         parsed_input.push((tk.0.unwrap(), tk.1));
-                        tk.0 = None;
+                        // tk.0 = Some(token);
                         tk.1 = Vec::new();
                     }
                     tk.0 = Some(token);
                     tk.1.push(CString::new(v).unwrap());
                 }
-                _ => {},
+                _ => {
+                    if tk.0.is_some() {
+                        parsed_input.push((tk.0.unwrap(), tk.1));
+                        tk.0 = Some(token);
+                        tk.1 = Vec::new();
+                    }
+                },
             }
         }
 
@@ -258,10 +261,9 @@ impl Shell {
             }
             args_cstr.reverse();
             match v { // first buffer match - for stuff that doesn't require/can't happen in a fork
-                "||" |
                 "cd" |
-                "exec" => {
-                    println!("{} {:?}", v, args_cstr);
+                "exec" |
+                "exit" => {
                     self.execute_process(v, args_cstr);
                 },
                 _ => {
